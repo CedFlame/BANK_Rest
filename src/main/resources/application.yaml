@@ -1,0 +1,35 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: ${JPA_SHOW_SQL:false}
+  liquibase:
+    change-log: classpath:/db/migration/db.changelog-master.yaml
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
+users:
+  default-page-size: ${USERS_DEFAULT_PAGE_SIZE:10}
+  max-page-size: ${USERS_MAX_PAGE_SIZE:100}
+
+crypto:
+  aes-key: ${CRYPTO_AES_KEY}
+  hmac-key: ${CRYPTO_HMAC_KEY}
+
+transfers:
+  default-page-size: ${TRANSFERS_DEFAULT_PAGE_SIZE:10}
+  max-page-size: ${TRANSFERS_MAX_PAGE_SIZE:100}
+  max-ttl-seconds: ${TRANSFERS_MAX_TTL_SECONDS:300}
+
+app:
+  clock:
+    zone: ${APP_CLOCK_ZONE:UTC}

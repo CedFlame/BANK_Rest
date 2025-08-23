@@ -1,0 +1,180 @@
+databaseChangeLog:
+  - changeSet:
+      id: 1-create-users
+      author: oleg
+      changes:
+        - createTable:
+            tableName: users
+            columns:
+              - column: { name: id, type: BIGINT, constraints: { primaryKey: true } }
+              - column: { name: username, type: VARCHAR(50), constraints: { unique: true, nullable: false } }
+              - column: { name: password, type: VARCHAR(100), constraints: { nullable: false } }
+              - column: { name: enabled, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: account_non_expired, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: account_non_locked, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: credentials_non_expired, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+              - column: { name: version, type: BIGINT, defaultValueNumeric: 0, constraints: { nullable: false } }
+        - createSequence:
+            sequenceName: users_id_seq
+            startValue: 1
+            incrementBy: 1
+        - createIndex:
+            tableName: users
+            indexName: idx_users_username
+            columns:
+              - column: { name: username }
+
+  - changeSet:
+      id: 2-create-user-roles
+      author: oleg
+      changes:
+        - createTable:
+            tableName: user_roles
+            columns:
+              - column: { name: user_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: role, type: VARCHAR(50), constraints: { nullable: false } }
+        - addPrimaryKey: { tableName: user_roles, columnNames: user_id,role, constraintName: pk_user_roles }
+        - addForeignKeyConstraint:
+            baseTableName: user_roles
+            baseColumnNames: user_id
+            constraintName: fk_user_roles_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createIndex:
+            tableName: user_roles
+            indexName: idx_user_roles_user_id
+            columns:
+              - column: { name: user_id }
+
+  - changeSet:
+      id: 3-create-cards
+      author: oleg
+      changes:
+        - createTable:
+            tableName: cards
+            columns:
+              - column: { name: id, type: BIGINT, constraints: { primaryKey: true } }
+              - column: { name: pan_ciphertext, type: VARCHAR(512), constraints: { nullable: false } }
+              - column: { name: pan_hash, type: VARCHAR(64), constraints: { nullable: false } }
+              - column: { name: pan_last4, type: VARCHAR(4), constraints: { nullable: false } }
+              - column: { name: expiry, type: VARCHAR(7), constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+              - column: { name: status, type: VARCHAR(20), constraints: { nullable: false } }
+              - column: { name: balance, type: BIGINT, defaultValueNumeric: 0, constraints: { nullable: false } }
+              - column: { name: user_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: version, type: BIGINT, defaultValueNumeric: 0, constraints: { nullable: false } }
+        - addForeignKeyConstraint:
+            baseTableName: cards
+            baseColumnNames: user_id
+            constraintName: fk_cards_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            tableName: cards
+            columnNames: pan_hash
+            constraintName: uq_cards_pan_hash
+        - createIndex:
+            tableName: cards
+            indexName: idx_cards_user_id
+            columns:
+              - column: { name: user_id }
+        - createIndex:
+            tableName: cards
+            indexName: idx_cards_status
+            columns:
+              - column: { name: status }
+        - createSequence:
+            sequenceName: cards_id_seq
+            startValue: 1
+            incrementBy: 1
+
+  - changeSet:
+      id: 4-create-transfers
+      author: oleg
+      changes:
+        - createTable:
+            tableName: transfers
+            columns:
+              - column: { name: id, type: BIGINT, constraints: { primaryKey: true } }
+              - column: { name: initiator_user_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: from_card_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: to_card_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: amount, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: status, type: VARCHAR(20), constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+              - column: { name: expires_at, type: TIMESTAMP }
+              - column: { name: executed_at, type: TIMESTAMP }
+              - column: { name: failure_code, type: VARCHAR(50) }
+              - column: { name: failure_message, type: VARCHAR(255) }
+              - column: { name: idempotency_key, type: VARCHAR(64) }
+              - column: { name: version, type: BIGINT, defaultValueNumeric: 0, constraints: { nullable: false } }
+        - addForeignKeyConstraint:
+            constraintName: fk_transfers_initiator_user
+            baseTableName: transfers
+            baseColumnNames: initiator_user_id
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - addForeignKeyConstraint:
+            constraintName: fk_transfers_from_card
+            baseTableName: transfers
+            baseColumnNames: from_card_id
+            referencedTableName: cards
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - addForeignKeyConstraint:
+            constraintName: fk_transfers_to_card
+            baseTableName: transfers
+            baseColumnNames: to_card_id
+            referencedTableName: cards
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        # --- заменили addCheckConstraint на обычный SQL ---
+        - sql:
+            dbms: postgresql
+            stripComments: true
+            splitStatements: false
+            sql: |
+              ALTER TABLE transfers
+              ADD CONSTRAINT chk_transfers_amount_positive CHECK (amount > 0);
+        - sql:
+            dbms: postgresql
+            stripComments: true
+            splitStatements: false
+            sql: |
+              ALTER TABLE transfers
+              ADD CONSTRAINT chk_transfers_cards_distinct CHECK (from_card_id <> to_card_id);
+        # --------------------------------------------------
+        - addUniqueConstraint:
+            tableName: transfers
+            columnNames: idempotency_key
+            constraintName: uq_transfers_idempotency_key
+        - createIndex:
+            tableName: transfers
+            indexName: idx_transfers_initiator_user_id
+            columns: [ { name: initiator_user_id } ]
+        - createIndex:
+            tableName: transfers
+            indexName: idx_transfers_from_card
+            columns: [ { name: from_card_id } ]
+        - createIndex:
+            tableName: transfers
+            indexName: idx_transfers_to_card
+            columns: [ { name: to_card_id } ]
+        - createIndex:
+            tableName: transfers
+            indexName: idx_transfers_status_expires_at
+            columns:
+              - column: { name: status }
+              - column: { name: expires_at }
+        - createIndex:
+            tableName: transfers
+            indexName: idx_transfers_created_at
+            columns: [ { name: created_at } ]
+        - createSequence:
+            sequenceName: transfers_id_seq
+            startValue: 1
+            incrementBy: 1
