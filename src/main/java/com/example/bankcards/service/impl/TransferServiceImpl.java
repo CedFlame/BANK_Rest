@@ -62,7 +62,7 @@ public class TransferServiceImpl implements TransferService {
         validateRequest(request);
         User initiator = loadInitiator(currentUserId);
 
-        Optional<Transfer> idem = findIdempotent(request);
+        Optional<Transfer> idem = findIdempotent(currentUserId, request);
         if (idem.isPresent()) {
             validateIdempotentSame(idem.get(), currentUserId, request);
             return TransferMapper.toDto(idem.get());
@@ -158,8 +158,10 @@ public class TransferServiceImpl implements TransferService {
         return userRepository.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
     }
 
-    private Optional<Transfer> findIdempotent(TransferRequest r) {
-        return hasIdemKey(r) ? transferRepository.findByIdempotencyKey(r.getIdempotencyKey()) : Optional.empty();
+    private Optional<Transfer> findIdempotent(Long initiatorId, TransferRequest r) {
+        return hasIdemKey(r)
+                ? transferRepository.findByInitiator_IdAndIdempotencyKey(initiatorId, r.getIdempotencyKey())
+                : Optional.empty();
     }
 
     private void validateIdempotentSame(Transfer t, Long currentUserId, TransferRequest r) {
@@ -216,7 +218,9 @@ public class TransferServiceImpl implements TransferService {
 
     private TransferDto handleIdempotencyRace(Long currentUserId, TransferRequest r, DataIntegrityViolationException e) {
         if (!hasIdemKey(r)) throw e;
-        Transfer t = transferRepository.findByIdempotencyKey(r.getIdempotencyKey()).orElseThrow(() -> e);
+        Transfer t = transferRepository
+                .findByInitiator_IdAndIdempotencyKey(currentUserId, r.getIdempotencyKey())
+                .orElseThrow(() -> e);
         validateIdempotentSame(t, currentUserId, r);
         return TransferMapper.toDto(t);
     }

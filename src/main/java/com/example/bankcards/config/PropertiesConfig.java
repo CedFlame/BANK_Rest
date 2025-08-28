@@ -1,5 +1,6 @@
-package com.example.bankcards.config.properties;
+package com.example.bankcards.config;
 
+import com.example.bankcards.config.properties.*;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 

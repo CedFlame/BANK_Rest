@@ -11,12 +11,12 @@ import java.util.List;
 @Setter
 @Component
 @ConfigurationProperties(prefix = "security.cors")
-public class CorsProps {
-    private boolean enabled = false;                          // главный флаг
+public class CorsProperties {
+    private boolean enabled = false;
     private List<String> allowedOrigins = List.of("http://localhost:3000");
     private List<String> allowedMethods = List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS");
     private List<String> allowedHeaders = List.of("Authorization","Content-Type","X-Requested-With");
     private List<String> exposedHeaders = List.of("Authorization");
     private boolean allowCredentials = false;
-    private long maxAge = 3600; // seconds
+    private long maxAge = 3600;
 }

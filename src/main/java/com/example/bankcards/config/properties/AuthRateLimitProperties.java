@@ -1,22 +1,27 @@
-// src/main/java/com/example/bankcards/config/properties/AuthRateLimitProperties.java
 package com.example.bankcards.config.properties;
 
+import jakarta.validation.constraints.Min;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
+import org.springframework.validation.annotation.Validated;
 
-import java.util.List;
+import java.util.Set;
 
 @Getter
 @Setter
-@Component
+@Validated
 @ConfigurationProperties(prefix = "security.ratelimit.auth")
 public class AuthRateLimitProperties {
     private boolean enabled = true;
-    private int capacity = 20;                 // запросов за окно
-    private int windowSeconds = 60;            // длина окна
-    private List<String> paths = List.of(      // какие пути ограничивать
+
+    @Min(1)
+    private int capacity = 20;
+
+    @Min(1)
+    private int windowSeconds = 60;
+
+    private Set<String> paths = Set.of(
             "/api/auth/login",
             "/api/auth/register"
     );

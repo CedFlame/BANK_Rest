@@ -53,14 +53,12 @@ class AdminUserControllerSecurityTest {
 
     @MockBean UserService userService;
 
-    // фильтры и entry point, от которых зависит SecurityConfig
     @MockBean JwtFilter jwtFilter;
     @MockBean AuthRateLimitFilter authRateLimitFilter;
     @MockBean RestAuthEntryPoint restAuthEntryPoint;
 
     @BeforeEach
     void passThroughSecurityFilters() throws Exception {
-        // Все кастомные фильтры — в режим "пропустить дальше"
         Answer<Void> pass = inv -> {
             ServletRequest req = inv.getArgument(0);
             ServletResponse res = inv.getArgument(1);
@@ -71,7 +69,6 @@ class AdminUserControllerSecurityTest {
         doAnswer(pass).when(jwtFilter).doFilter(any(), any(), any());
         doAnswer(pass).when(authRateLimitFilter).doFilter(any(), any(), any());
 
-        // AuthenticationEntryPoint — всегда 401 для неаутентифицированных запросов
         doAnswer(inv -> {
             var response = (jakarta.servlet.http.HttpServletResponse) inv.getArgument(1);
             response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
@@ -92,7 +89,6 @@ class AdminUserControllerSecurityTest {
         return u;
     }
 
-    // -------- list --------
     @Nested
     class ListUsers {
         @Test
@@ -119,7 +115,6 @@ class AdminUserControllerSecurityTest {
         }
     }
 
-    // -------- getById --------
     @Nested
     class GetById {
         @Test
@@ -154,7 +149,6 @@ class AdminUserControllerSecurityTest {
         }
     }
 
-    // -------- create --------
     @Nested
     class CreateUser {
         @Test
@@ -177,7 +171,8 @@ class AdminUserControllerSecurityTest {
             CreateUserAdminRequest req = new CreateUserAdminRequest();
             req.setEmail("admin@example.com");
             req.setPassword("secret");
-            req.setRoles(Set.of()); // пусто
+            req.setConfirmPassword("secret");
+            req.setRoles(Set.of());
 
             when(userService.createUser(anyString(), anyString(), anySet())).thenReturn(new UserDto());
 
@@ -197,7 +192,8 @@ class AdminUserControllerSecurityTest {
         void customRoles() throws Exception {
             CreateUserAdminRequest req = new CreateUserAdminRequest();
             req.setEmail("boss@example.com");
-            req.setPassword("pwd");
+            req.setPassword("password");
+            req.setConfirmPassword("password");
             req.setRoles(Set.of(Role.ROLE_USER, Role.ROLE_ADMIN));
 
             when(userService.createUser(anyString(), anyString(), anySet())).thenReturn(new UserDto());
@@ -209,12 +205,11 @@ class AdminUserControllerSecurityTest {
                             .content(objectMapper.writeValueAsString(req)))
                     .andExpect(status().isCreated());
 
-            verify(userService).createUser(eq("boss@example.com"), eq("pwd"),
+            verify(userService).createUser(eq("boss@example.com"), eq("password"),
                     eq(EnumSet.of(Role.ROLE_USER, Role.ROLE_ADMIN)));
         }
     }
 
-    // -------- updateRoles --------
     @Nested
     class UpdateRoles {
         @Test
@@ -251,7 +246,6 @@ class AdminUserControllerSecurityTest {
         }
     }
 
-    // -------- delete --------
     @Nested
     class DeleteUser {
         @Test
@@ -274,7 +268,6 @@ class AdminUserControllerSecurityTest {
         }
     }
 
-    // -------- exists --------
     @Nested
     class Exists {
         @Test
@@ -316,7 +309,7 @@ class AdminUserControllerSecurityTest {
         @Bean
         CorsProperties corsProperties() {
             CorsProperties p = new CorsProperties();
-            p.setEnabled(false); // в тестах CORS отключаем
+            p.setEnabled(false);
             return p;
         }
     }

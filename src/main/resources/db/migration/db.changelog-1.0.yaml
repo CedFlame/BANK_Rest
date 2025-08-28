@@ -6,7 +6,7 @@ databaseChangeLog:
         - createTable:
             tableName: users
             columns:
-              - column: { name: id, type: BIGINT, constraints: { primaryKey: true } }
+              - column: { name: id, type: BIGINT, constraints: { primaryKey: true, nullable: false } }
               - column: { name: username, type: VARCHAR(50), constraints: { unique: true, nullable: false } }
               - column: { name: password, type: VARCHAR(100), constraints: { nullable: false } }
               - column: { name: enabled, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
@@ -19,6 +19,12 @@ databaseChangeLog:
             sequenceName: users_id_seq
             startValue: 1
             incrementBy: 1
+        - sql:
+            dbms: postgresql
+            splitStatements: false
+            sql: |
+              ALTER TABLE users
+              ALTER COLUMN id SET DEFAULT nextval('users_id_seq');
         - createIndex:
             tableName: users
             indexName: idx_users_username
@@ -55,7 +61,7 @@ databaseChangeLog:
         - createTable:
             tableName: cards
             columns:
-              - column: { name: id, type: BIGINT, constraints: { primaryKey: true } }
+              - column: { name: id, type: BIGINT, constraints: { primaryKey: true, nullable: false } }
               - column: { name: pan_ciphertext, type: VARCHAR(512), constraints: { nullable: false } }
               - column: { name: pan_hash, type: VARCHAR(64), constraints: { nullable: false } }
               - column: { name: pan_last4, type: VARCHAR(4), constraints: { nullable: false } }
@@ -90,6 +96,12 @@ databaseChangeLog:
             sequenceName: cards_id_seq
             startValue: 1
             incrementBy: 1
+        - sql:
+            dbms: postgresql
+            splitStatements: false
+            sql: |
+              ALTER TABLE cards
+              ALTER COLUMN id SET DEFAULT nextval('cards_id_seq');
 
   - changeSet:
       id: 4-create-transfers
@@ -98,7 +110,7 @@ databaseChangeLog:
         - createTable:
             tableName: transfers
             columns:
-              - column: { name: id, type: BIGINT, constraints: { primaryKey: true } }
+              - column: { name: id, type: BIGINT, constraints: { primaryKey: true, nullable: false } }
               - column: { name: initiator_user_id, type: BIGINT, constraints: { nullable: false } }
               - column: { name: from_card_id, type: BIGINT, constraints: { nullable: false } }
               - column: { name: to_card_id, type: BIGINT, constraints: { nullable: false } }
@@ -132,7 +144,6 @@ databaseChangeLog:
             referencedTableName: cards
             referencedColumnNames: id
             onDelete: RESTRICT
-        # --- заменили addCheckConstraint на обычный SQL ---
         - sql:
             dbms: postgresql
             stripComments: true
@@ -147,11 +158,13 @@ databaseChangeLog:
             sql: |
               ALTER TABLE transfers
               ADD CONSTRAINT chk_transfers_cards_distinct CHECK (from_card_id <> to_card_id);
-        # --------------------------------------------------
-        - addUniqueConstraint:
-            tableName: transfers
-            columnNames: idempotency_key
-            constraintName: uq_transfers_idempotency_key
+        - sql:
+            dbms: postgresql
+            splitStatements: false
+            sql: |
+              CREATE UNIQUE INDEX uq_transfers_idempotency_key_not_null
+              ON transfers (idempotency_key)
+              WHERE idempotency_key IS NOT NULL;
         - createIndex:
             tableName: transfers
             indexName: idx_transfers_initiator_user_id
@@ -178,3 +191,33 @@ databaseChangeLog:
             sequenceName: transfers_id_seq
             startValue: 1
             incrementBy: 1
+        - sql:
+            dbms: postgresql
+            splitStatements: false
+            sql: |
+              ALTER TABLE transfers
+              ALTER COLUMN id SET DEFAULT nextval('transfers_id_seq');
+
+  - changeSet:
+      id: 4.1-alter-transfers-idempotency-composite
+      author: oleg
+      changes:
+        - dropIndex:
+            indexName: uq_transfers_idempotency_key_not_null
+            tableName: transfers
+        - sql:
+            dbms: postgresql
+            splitStatements: false
+            sql: |
+              CREATE UNIQUE INDEX uq_transfers_initiator_idem_not_null
+              ON transfers (initiator_user_id, idempotency_key)
+              WHERE idempotency_key IS NOT NULL;
+
+  - changeSet:
+      id: 1.1-alter-users-username-length
+      author: oleg
+      changes:
+        - modifyDataType:
+            tableName: users
+            columnName: username
+            newDataType: VARCHAR(254)

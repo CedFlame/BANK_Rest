@@ -8,6 +8,7 @@ import com.example.bankcards.entity.Card;
 import com.example.bankcards.entity.User;
 import com.example.bankcards.entity.enums.CardStatus;
 import com.example.bankcards.exception.CardAlreadyExistsException;
+import com.example.bankcards.exception.CardDeletionNotAllowedException;
 import com.example.bankcards.exception.CardExpiredException;
 import com.example.bankcards.exception.CardNotFoundException;
 import com.example.bankcards.exception.InvalidCardStateException;
@@ -15,6 +16,7 @@ import com.example.bankcards.exception.UserNotFoundException;
 import com.example.bankcards.mapper.CardMapper;
 import com.example.bankcards.mapper.PageDtoMapper;
 import com.example.bankcards.repository.CardRepository;
+import com.example.bankcards.repository.TransferRepository;
 import com.example.bankcards.repository.UserRepository;
 import com.example.bankcards.security.crypto.CryptoService;
 import com.example.bankcards.security.crypto.HmacService;
@@ -22,7 +24,10 @@ import com.example.bankcards.service.CardService;
 import com.example.bankcards.util.CardUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +42,7 @@ public class CardServiceImpl implements CardService {
 
     private final CardRepository cardRepository;
     private final UserRepository userRepository;
+    private final TransferRepository transferRepository;
     private final CryptoService cryptoService;
     private final HmacService hmacService;
     private final Clock clock;
@@ -51,10 +57,8 @@ public class CardServiceImpl implements CardService {
         String panHash = ensurePanUniqueAndGetHash(pan);
         YearMonth expiry = CardUtils.parseExpiry(req.getExpiry());
         validateNotPastExpiry(expiry);
-
         Card card = buildCard(owner, pan, panHash, expiry);
         card = cardRepository.save(card);
-
         log.info("Card created for user {} ****{}", owner.getId(), card.getPanLast4());
         return CardMapper.toDto(card);
     }
@@ -99,6 +103,10 @@ public class CardServiceImpl implements CardService {
     @Transactional
     public void delete(Long cardId) {
         Card c = getCardOrThrow(cardId);
+        boolean hasTransfers = transferRepository.existsByFromCard_Id(cardId) || transferRepository.existsByToCard_Id(cardId);
+        if (hasTransfers) {
+            throw new CardDeletionNotAllowedException(cardId);
+        }
         cardRepository.delete(c);
         log.info("Card deleted: {}", cardId);
     }

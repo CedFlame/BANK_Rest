@@ -3,12 +3,10 @@ package com.example.bankcards.security.jwt;
 import com.example.bankcards.config.properties.JwtProperties;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
@@ -20,7 +18,7 @@ public class JwtProvider {
     private final long expirationMs;
 
     public JwtProvider(JwtProperties props) {
-        this.key = Keys.hmacShaKeyFor(props.getSecret().getBytes(StandardCharsets.UTF_8));
+        this.key = props.secretKey();
         this.expirationMs = props.getExpirationMs();
     }
 

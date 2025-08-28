@@ -14,9 +14,9 @@ import java.time.YearMonth;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-@EqualsAndHashCode(of = "id")
 @Entity
 @Table(name = "cards")
+@EqualsAndHashCode(of = "id")
 @EntityListeners(AuditingEntityListener.class)
 public class Card {
 
@@ -46,7 +46,7 @@ public class Card {
     private CardStatus status;
 
     @Column(nullable = false)
-    private long balance;     // примитив
+    private long balance;
 
     @Version
     @Column(nullable = false)
@@ -55,4 +55,5 @@ public class Card {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
 }

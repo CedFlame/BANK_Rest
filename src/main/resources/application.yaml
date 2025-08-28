@@ -13,13 +13,13 @@ spring:
   liquibase:
     change-log: classpath:/db/migration/db.changelog-master.yaml
 
-jwt:
-  secret: ${JWT_SECRET}
-  expiration-ms: ${JWT_EXPIRATION_MS:86400000}
-
 users:
   default-page-size: ${USERS_DEFAULT_PAGE_SIZE:10}
   max-page-size: ${USERS_MAX_PAGE_SIZE:100}
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
 crypto:
   aes-key: ${CRYPTO_AES_KEY}
@@ -29,7 +29,33 @@ transfers:
   default-page-size: ${TRANSFERS_DEFAULT_PAGE_SIZE:10}
   max-page-size: ${TRANSFERS_MAX_PAGE_SIZE:100}
   max-ttl-seconds: ${TRANSFERS_MAX_TTL_SECONDS:300}
+  scheduler:
+    enabled: true
+    fixed-delay: 10s
+    batch-size: 100
+    mode: EXPIRE
 
 app:
   clock:
     zone: ${APP_CLOCK_ZONE:UTC}
+security:
+  cors:
+    enabled: false
+    allowed-origins: ["http://localhost:3000"]
+    allowed-methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"]
+    allowed-headers: ["Authorization","Content-Type","X-Requested-With"]
+    exposed-headers: ["Authorization"]
+    allow-credentials: false
+    max-age: 3600
+
+  ratelimit:
+    auth:
+      enabled: true
+      capacity: 20
+      window-seconds: 60
+      paths: ["/api/auth/login", "/api/auth/register"]
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

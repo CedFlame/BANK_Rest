@@ -1,3 +1,4 @@
+package com.example.bankcards.security;
 
 import com.example.bankcards.config.properties.AuthRateLimitProperties;
 import jakarta.servlet.FilterChain;
@@ -25,6 +26,15 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     private final AntPathMatcher matcher = new AntPathMatcher();
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
 
+    // swagger whitelist
+    private static final String[] SWAGGER_WHITELIST = {
+            "/v3/api-docs",
+            "/v3/api-docs.yaml",
+            "/v3/api-docs/**",
+            "/swagger-ui.html",
+            "/swagger-ui/**"
+    };
+
     @Value(staticConstructor = "of")
     private static class Bucket {
         int remaining;
@@ -34,7 +44,18 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         if (!props.isEnabled()) return true;
+
         String path = request.getServletPath();
+
+        // 🔥 если swagger/doc путь → не фильтруем
+        for (String skip : SWAGGER_WHITELIST) {
+            if (matcher.match(skip, path)) {
+                log.debug("Skipping rate-limit filter for {}", path);
+                return true;
+            }
+        }
+
+        // остальное решается по props.getPaths()
         return props.getPaths().stream().noneMatch(p -> matcher.match(p, path));
     }
 

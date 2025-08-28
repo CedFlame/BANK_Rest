@@ -1,18 +1,39 @@
-version: '3.8'
-
 services:
-  postgres:
-    image: postgres:15
-    container_name: bank-postgres
-    restart: always
+  app:
+    build: .
+    container_name: bank-cards-api
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
     environment:
+      SERVER_PORT: 8080
+      DB_URL: jdbc:postgresql://db:5432/bankdb
+      DB_USERNAME: bankuser
+      DB_PASSWORD: bankpass
+      JWT_SECRET: ""
+      JWT_EXPIRATION_MS: 86400000
+      USERS_DEFAULT_PAGE_SIZE: 10
+      USERS_MAX_PAGE_SIZE: 100
+      CRYPTO_AES_KEY: ""
+      CRYPTO_HMAC_KEY: ""
+      TRANSFERS_DEFAULT_PAGE_SIZE: 10
+      TRANSFERS_MAX_PAGE_SIZE: 100
+      TRANSFERS_MAX_TTL_SECONDS: 300
+      APP_CLOCK_ZONE: UTC
+      JPA_SHOW_SQL: false
+    depends_on:
+      - db
+
+  db:
+    image: postgres:15
+    container_name: bankcards-postgres
+    environment:
+      POSTGRES_DB: bankdb
       POSTGRES_USER: bankuser
       POSTGRES_PASSWORD: bankpass
-      POSTGRES_DB: bankdb
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql/data
 
 volumes:
-  postgres_data:
+  db_data:

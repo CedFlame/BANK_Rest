@@ -11,7 +11,7 @@ import java.time.ZoneId;
 public class TimeConfig {
 
     @Bean
-    public Clock clock(@Value("${app.clock.zone}") String zone) {
+    public Clock clock(@Value("${app.clock.zone:UTC}") String zone) {
         return Clock.system(ZoneId.of(zone));
     }
 }

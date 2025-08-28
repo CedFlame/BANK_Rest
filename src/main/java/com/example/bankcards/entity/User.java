@@ -17,11 +17,11 @@ import java.util.Set;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-@EqualsAndHashCode(of = "id")
 @ToString(exclude = {"password", "cards"})
 @Entity
 @Table(name = "users")
 @EntityListeners(AuditingEntityListener.class)
+@EqualsAndHashCode(of = "id")
 public class User {
 
     @Id
@@ -29,7 +29,7 @@ public class User {
     @SequenceGenerator(name = "users_id_seq", sequenceName = "users_id_seq", allocationSize = 1)
     private Long id;
 
-    @Column(name = "username", unique = true, nullable = false, length = 50)
+    @Column(name = "username", unique = true, nullable = false, length = 254)
     private String username;
 
     @Column(name = "password", nullable = false, length = 100)
@@ -56,9 +56,8 @@ public class User {
     private LocalDateTime createdAt;
 
     @Version
-    @Builder.Default
     @Column(name = "version", nullable = false)
-    private Long version = 0L;
+    private Long version; // убрали Builder.Default
 
     @Builder.Default
     @ElementCollection(fetch = FetchType.EAGER)
@@ -70,4 +69,5 @@ public class User {
     @Builder.Default
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Card> cards = new ArrayList<>();
+
 }

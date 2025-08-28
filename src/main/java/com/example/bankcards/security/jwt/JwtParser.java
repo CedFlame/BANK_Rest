@@ -4,11 +4,9 @@ import com.example.bankcards.config.properties.JwtProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 @Component
@@ -17,7 +15,7 @@ public class JwtParser {
     private final SecretKey key;
 
     public JwtParser(JwtProperties props) {
-        this.key = Keys.hmacShaKeyFor(props.getSecret().getBytes(StandardCharsets.UTF_8));
+        this.key = props.secretKey();
     }
 
     public Claims parseClaims(String token) throws JwtException {

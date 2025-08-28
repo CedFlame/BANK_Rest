@@ -25,7 +25,7 @@ public class AesGcmCryptoService implements CryptoService {
     private static final int IV_LEN_BYTES = 12;
 
     private SecretKey key() {
-        byte[] k = props.getAesKey().getBytes(StandardCharsets.UTF_8);
+        byte[] k = props.aesKeyBytes();
         return new SecretKeySpec(k, ALG);
     }
 

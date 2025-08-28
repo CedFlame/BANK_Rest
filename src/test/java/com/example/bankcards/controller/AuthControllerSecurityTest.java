@@ -44,13 +44,12 @@ class AuthControllerSecurityTest {
 
     @MockBean private AuthService authService;
 
-    // SecurityConfig зависит от этих бинов — мокируем их
     @MockBean private JwtFilter jwtFilter;
     @MockBean private AuthRateLimitFilter authRateLimitFilter;
     @MockBean private RestAuthEntryPoint restAuthEntryPoint;
 
     @BeforeEach
-    void makeFiltersPassThrough() throws Exception {
+    void passThroughSecurityFilters() throws Exception {
         Answer<Void> pass = inv -> {
             ServletRequest req = inv.getArgument(0);
             ServletResponse res = inv.getArgument(1);
@@ -60,6 +59,16 @@ class AuthControllerSecurityTest {
         };
         doAnswer(pass).when(jwtFilter).doFilter(any(), any(), any());
         doAnswer(pass).when(authRateLimitFilter).doFilter(any(), any(), any());
+
+        doAnswer(inv -> {
+            var response = (jakarta.servlet.http.HttpServletResponse) inv.getArgument(1);
+            response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"error\":\"Unauthorized\"}");
+            return null;
+        }).when(restAuthEntryPoint).commence(any(), any(), any());
+
+        reset(authService);
     }
 
     private static UserDto user(long id, String username) {
@@ -75,10 +84,10 @@ class AuthControllerSecurityTest {
     @DisplayName("GET /api/auth/me")
     class Me {
         @Test
-        @DisplayName("403 без аутентификации (из-за @PreAuthorize)")
+        @DisplayName("401 без аутентификации")
         void unauthorized() throws Exception {
             mockMvc.perform(get("/api/auth/me").accept(MediaType.APPLICATION_JSON))
-                    .andExpect(status().isForbidden());
+                    .andExpect(status().isUnauthorized());
             verifyNoInteractions(authService);
         }
 
@@ -96,6 +105,7 @@ class AuthControllerSecurityTest {
                     .andExpect(jsonPath("$.username").value("user@example.com"));
 
             verify(authService).me();
+            verifyNoMoreInteractions(authService);
         }
     }
 
@@ -105,10 +115,11 @@ class AuthControllerSecurityTest {
         @Test
         @DisplayName("200 при валидном теле")
         void ok() throws Exception {
-            when(authService.login("user@example.com", "Secret123!")).thenReturn("jwt-token");
+            when(authService.login("user@example.com", "UltraStrong_Passw0rd#2024"))
+                    .thenReturn("jwt-token");
 
             String body = """
-              {"email":"user@example.com","password":"Secret123!"}
+              {"username":"user@example.com","password":"UltraStrong_Passw0rd#2024"}
             """;
 
             mockMvc.perform(post("/api/auth/login")
@@ -121,14 +132,15 @@ class AuthControllerSecurityTest {
                     .andExpect(jsonPath("$.tokenType").value("Bearer"))
                     .andExpect(jsonPath("$.accessToken").value("jwt-token"));
 
-            verify(authService).login("user@example.com", "Secret123!");
+            verify(authService).login("user@example.com", "UltraStrong_Passw0rd#2024");
+            verifyNoMoreInteractions(authService);
         }
 
         @Test
         @DisplayName("400 при пустых полях")
         void badRequest() throws Exception {
             String body = """
-              {"email":"","password":""}
+              {"username":"","password":""}
             """;
 
             mockMvc.perform(post("/api/auth/login")
@@ -148,11 +160,15 @@ class AuthControllerSecurityTest {
         @Test
         @DisplayName("201 при валидном теле")
         void ok() throws Exception {
-            when(authService.register("user@example.com", "Secret123!"))
+            when(authService.register("user@example.com", "UltraStrong_Passw0rd#2024"))
                     .thenReturn(user(1L, "user@example.com"));
 
             String body = """
-              {"email":"user@example.com","password":"Secret123!"}
+              {
+                "username":"user@example.com",
+                "password":"UltraStrong_Passw0rd#2024",
+                "confirmPassword":"UltraStrong_Passw0rd#2024"
+              }
             """;
 
             mockMvc.perform(post("/api/auth/register")
@@ -165,14 +181,15 @@ class AuthControllerSecurityTest {
                     .andExpect(jsonPath("$.id").value(1))
                     .andExpect(jsonPath("$.username").value("user@example.com"));
 
-            verify(authService).register("user@example.com", "Secret123!");
+            verify(authService).register("user@example.com", "UltraStrong_Passw0rd#2024");
+            verifyNoMoreInteractions(authService);
         }
 
         @Test
         @DisplayName("400 при пустых полях")
         void badRequest() throws Exception {
             String body = """
-              {"email":"","password":""}
+              {"username":"","password":""}
             """;
 
             mockMvc.perform(post("/api/auth/register")

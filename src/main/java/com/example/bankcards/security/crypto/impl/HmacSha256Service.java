@@ -18,8 +18,9 @@ public class HmacSha256Service implements HmacService {
     @Override
     public String hmacHex(String pan) {
         try {
+            byte[] k = props.hmacKeyBytes();
             Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(props.getHmacKey().getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            mac.init(new SecretKeySpec(k, "HmacSHA256"));
             byte[] bytes = mac.doFinal(pan.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder(bytes.length * 2);
             for (byte b : bytes) sb.append(String.format("%02x", b));
