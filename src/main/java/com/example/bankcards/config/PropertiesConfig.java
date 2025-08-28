@@ -9,5 +9,7 @@ import org.springframework.context.annotation.Configuration;
         UsersProperties.class,
         CryptoProperties.class,
         TransfersProperties.class,
+        TransfersSchedulerProperties.class,
+        AuthRateLimitProperties.class,
 })
 public class PropertiesConfig {}

@@ -1,0 +1,1175 @@
+openapi: 3.0.1
+info:
+  title: Bank Cards API
+  description: |
+    REST API для управления пользователями, картами и переводами.
+    Авторизация по JWT: нажмите Authorize и введите `Bearer <token>`.
+  contact:
+    name: Team
+    email: support@example.com
+  license:
+    name: MIT
+  version: 1.0.0
+servers:
+- url: http://localhost:8080
+  description: Generated server url
+security:
+- BearerAuth: []
+tags:
+- name: "Admin: Users"
+  description: Администрирование пользователей (только для роли ADMIN)
+- name: Auth
+  description: Аутентификация и профиль
+- name: Transfers
+  description: Переводы между картами
+- name: Cards
+  description: Операции с банковскими картами
+paths:
+  /api/transfers:
+    get:
+      tags:
+      - Transfers
+      summary: Список всех переводов (ADMIN)
+      description: Постраничный список всех переводов в системе.
+      operationId: listAll
+      parameters:
+      - name: page
+        in: query
+        description: Номер страницы (0..N)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+        example: 0
+      - name: size
+        in: query
+        description: Размер страницы (1..50)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 10
+        example: 10
+      responses:
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PageDtoTransferDto'
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PageDto'
+        "401":
+          description: Unauthorized
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PageDtoTransferDto'
+      security:
+      - BearerAuth: []
+    post:
+      tags:
+      - Transfers
+      summary: Инициировать перевод
+      description: |
+        Создает перевод между двумя картами текущего пользователя.
+        Для идемпотентности можно передать заголовок **Idempotency-Key**.
+      operationId: initiate
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        description: Ключ идемпотентности запроса
+        required: false
+        schema:
+          type: string
+        example: idem-123
+      requestBody:
+        description: "Данные перевода (fromCardId, toCardId, amount, ttlSeconds)"
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferRequest'
+        required: true
+      responses:
+        "404":
+          description: Карта/пользователь не найдены
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TransferDto'
+        "409":
+          description: Конфликт идемпотентности
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TransferDto'
+        "400":
+          description: Ошибка валидации/бизнес-правил
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TransferDto'
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TransferDto'
+        "200":
+          description: Перевод создан
+          headers:
+            Idempotency-Key:
+              description: Переданный ключ идемпотентности (если был)
+              style: simple
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TransferDto'
+        "401":
+          description: Unauthorized
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TransferDto'
+      security:
+      - BearerAuth: []
+  /api/transfers/{id}:cancel:
+    post:
+      tags:
+      - Transfers
+      summary: Отменить перевод
+      description: Отменяет *собственный* PENDING-перевод (пока не истёк).
+      operationId: cancel
+      parameters:
+      - name: id
+        in: path
+        description: ID перевода
+        required: true
+        schema:
+          type: integer
+          format: int64
+        example: 1001
+      responses:
+        "403":
+          description: Не ваш перевод или неверное состояние
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TransferDto'
+        "404":
+          description: Перевод не найден
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TransferDto'
+        "200":
+          description: Перевод отменён
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TransferDto'
+        "401":
+          description: Unauthorized
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TransferDto'
+      security:
+      - BearerAuth: []
+  /api/cards/{userId}:
+    post:
+      tags:
+      - Cards
+      summary: Создать карту пользователю (ADMIN)
+      description: Создаёт карту для указанного пользователя.
+      operationId: createForUser
+      parameters:
+      - name: userId
+        in: path
+        description: ID владельца карты
+        required: true
+        schema:
+          type: integer
+          format: int64
+        example: 5
+      requestBody:
+        description: PAN в виде 16-значной строки и срок действия (YYYY-MM)
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardCreateRequest'
+        required: true
+      responses:
+        "400":
+          description: Ошибка валидации
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CardDto'
+        "404":
+          description: Пользователь не найден
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CardDto'
+        "200":
+          description: Создано
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CardDto'
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CardDto'
+        "409":
+          description: Карта уже существует
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CardDto'
+        "401":
+          description: Unauthorized
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CardDto'
+      security:
+      - BearerAuth: []
+  /api/auth/register:
+    post:
+      tags:
+      - Auth
+      summary: Регистрация
+      description: Создаёт нового пользователя по email/username и паролю.
+      operationId: register
+      requestBody:
+        description: Данные для регистрации
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+        required: true
+      responses:
+        "400":
+          description: Ошибка валидации
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        "409":
+          description: Пользователь уже существует
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        "201":
+          description: Пользователь создан
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+  /api/auth/login:
+    post:
+      tags:
+      - Auth
+      summary: Логин
+      description: Возвращает JWT токен в полях tokenType/accessToken.
+      operationId: login
+      requestBody:
+        description: Учетные данные
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        "400":
+          description: Ошибка валидации
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        "401":
+          description: Неверные учетные данные
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+  /api/admin/users:
+    get:
+      tags:
+      - "Admin: Users"
+      summary: Список пользователей
+      description: Возвращает страницу пользователей. Доступно только ADMIN.
+      operationId: list
+      parameters:
+      - name: page
+        in: query
+        description: Номер страницы (0..N)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+        example: 0
+      - name: size
+        in: query
+        description: Размер страницы (1..100)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 10
+        example: 10
+      - name: search
+        in: query
+        description: Подстрока для поиска по username (email)
+        required: false
+        schema:
+          type: string
+      responses:
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PageDtoUserDto'
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PageDto'
+        "401":
+          description: Unauthorized
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PageDtoUserDto'
+      security:
+      - BearerAuth: []
+    post:
+      tags:
+      - "Admin: Users"
+      summary: Создать пользователя
+      description: Создаёт нового пользователя. Если роли не переданы — будет назначена
+        ROLE_USER. Доступно только ADMIN.
+      operationId: create
+      requestBody:
+        description: Данные для создания пользователя
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserAdminRequest'
+        required: true
+      responses:
+        "201":
+          description: Создано
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        "400":
+          description: Ошибка валидации
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        "409":
+          description: Пользователь уже существует
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        "401":
+          description: Unauthorized
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+      security:
+      - BearerAuth: []
+  /api/cards/{id}:block:
+    patch:
+      tags:
+      - Cards
+      summary: Заблокировать карту (ADMIN)
+      description: Меняет статус карты на BLOCKED.
+      operationId: block
+      parameters:
+      - name: id
+        in: path
+        description: ID карты
+        required: true
+        schema:
+          type: integer
+          format: int64
+        example: 100
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CardDto'
+        "404":
+          description: Карта не найдена
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CardDto'
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CardDto'
+        "409":
+          description: Неверное состояние карты или карта просрочена
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CardDto'
+        "401":
+          description: Unauthorized
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CardDto'
+      security:
+      - BearerAuth: []
+  /api/cards/{id}:activate:
+    patch:
+      tags:
+      - Cards
+      summary: Активировать карту (ADMIN)
+      description: Меняет статус карты на ACTIVE.
+      operationId: activate
+      parameters:
+      - name: id
+        in: path
+        description: ID карты
+        required: true
+        schema:
+          type: integer
+          format: int64
+        example: 101
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CardDto'
+        "404":
+          description: Карта не найдена
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CardDto'
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CardDto'
+        "409":
+          description: Неверное состояние карты или карта просрочена
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CardDto'
+        "401":
+          description: Unauthorized
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CardDto'
+      security:
+      - BearerAuth: []
+  /api/admin/users/{id}/roles:
+    patch:
+      tags:
+      - "Admin: Users"
+      summary: Обновить роли пользователя
+      description: Полностью заменяет набор ролей пользователя. Доступно только ADMIN.
+      operationId: updateRoles
+      parameters:
+      - name: id
+        in: path
+        description: ID пользователя
+        required: true
+        schema:
+          type: integer
+          format: int64
+        example: 7
+      requestBody:
+        description: Новый набор ролей
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRolesRequest'
+        required: true
+      responses:
+        "400":
+          description: Ошибка валидации
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        "404":
+          description: Пользователь не найден
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        "401":
+          description: Unauthorized
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+      security:
+      - BearerAuth: []
+  /api/transfers/my:
+    get:
+      tags:
+      - Transfers
+      summary: Мои переводы
+      description: Постраничный список переводов текущего пользователя.
+      operationId: listMy
+      parameters:
+      - name: page
+        in: query
+        description: Номер страницы (0..N)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+        example: 0
+      - name: size
+        in: query
+        description: Размер страницы (1..50)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 10
+        example: 10
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PageDto'
+        "401":
+          description: Unauthorized
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PageDtoTransferDto'
+      security:
+      - BearerAuth: []
+  /api/cards:
+    get:
+      tags:
+      - Cards
+      summary: Список всех карт (ADMIN)
+      description: Постраничный список карт со статус-фильтром.
+      operationId: listAll_1
+      parameters:
+      - name: page
+        in: query
+        description: Номер страницы (0..N)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+        example: 0
+      - name: size
+        in: query
+        description: Размер страницы (1..100)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 10
+        example: 10
+      - name: status
+        in: query
+        description: Фильтр по статусу
+        required: false
+        schema:
+          type: string
+          enum:
+          - ACTIVE
+          - BLOCKED
+          - EXPIRED
+        example: ACTIVE
+      responses:
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PageDtoCardDto'
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PageDto'
+        "401":
+          description: Unauthorized
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PageDtoCardDto'
+      security:
+      - BearerAuth: []
+  /api/cards/my:
+    get:
+      tags:
+      - Cards
+      summary: Мои карты
+      description: Возвращает страницу карт текущего пользователя.
+      operationId: listMy_1
+      parameters:
+      - name: page
+        in: query
+        description: Номер страницы (0..N)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+        example: 0
+      - name: size
+        in: query
+        description: Размер страницы (1..100)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 10
+        example: 10
+      - name: status
+        in: query
+        description: Фильтр по статусу карты
+        required: false
+        schema:
+          type: string
+          enum:
+          - ACTIVE
+          - BLOCKED
+          - EXPIRED
+        example: ACTIVE
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PageDto'
+        "401":
+          description: Unauthorized
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PageDtoCardDto'
+      security:
+      - BearerAuth: []
+  /api/auth/me:
+    get:
+      tags:
+      - Auth
+      summary: Текущий пользователь
+      description: Возвращает профиль текущего аутентифицированного пользователя.
+      operationId: me
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        "401":
+          description: Unauthorized
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+      security:
+      - BearerAuth: []
+  /api/admin/users/{id}:
+    get:
+      tags:
+      - "Admin: Users"
+      summary: Получить пользователя по id
+      description: Возвращает информацию о пользователе. Доступно только ADMIN.
+      operationId: getById
+      parameters:
+      - name: id
+        in: path
+        description: ID пользователя
+        required: true
+        schema:
+          type: integer
+          format: int64
+        example: 42
+      responses:
+        "404":
+          description: Пользователь не найден
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        "200":
+          description: Пользователь найден
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        "401":
+          description: Unauthorized
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserDto'
+      security:
+      - BearerAuth: []
+    delete:
+      tags:
+      - "Admin: Users"
+      summary: Удалить пользователя
+      description: Удаляет пользователя по id. Доступно только ADMIN.
+      operationId: delete_1
+      parameters:
+      - name: id
+        in: path
+        description: ID пользователя
+        required: true
+        schema:
+          type: integer
+          format: int64
+        example: 9
+      responses:
+        "204":
+          description: Удалён
+        "404":
+          description: Пользователь не найден
+        "403":
+          description: Forbidden
+        "401":
+          description: Unauthorized
+      security:
+      - BearerAuth: []
+  /api/admin/users/exists:
+    get:
+      tags:
+      - "Admin: Users"
+      summary: Проверить существование пользователя по username/email
+      description: "Возвращает флаг { exists: true|false }. Доступно только ADMIN."
+      operationId: exists
+      parameters:
+      - name: username
+        in: query
+        description: Email (username) для проверки
+        required: true
+        schema:
+          maxLength: 254
+          minLength: 0
+          type: string
+        example: user@example.com
+      responses:
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: boolean
+        "400":
+          description: Невалидный email
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: boolean
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+        "401":
+          description: Unauthorized
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: boolean
+      security:
+      - BearerAuth: []
+  /api/cards/{id}:
+    delete:
+      tags:
+      - Cards
+      summary: Удалить карту (ADMIN)
+      description: "Удаляет карту по ID. Невозможно удалить, если по карте есть пе\
+        реводы."
+      operationId: delete
+      parameters:
+      - name: id
+        in: path
+        description: ID карты
+        required: true
+        schema:
+          type: integer
+          format: int64
+        example: 300
+      responses:
+        "409":
+          description: Удаление запрещено (есть связанные переводы)
+        "404":
+          description: Карта не найдена
+        "403":
+          description: Forbidden
+        "204":
+          description: Удалено
+        "401":
+          description: Unauthorized
+      security:
+      - BearerAuth: []
+components:
+  schemas:
+    TransferRequest:
+      required:
+      - amount
+      - fromCardId
+      - toCardId
+      type: object
+      properties:
+        fromCardId:
+          type: integer
+          format: int64
+        toCardId:
+          type: integer
+          format: int64
+        amount:
+          minimum: 1
+          type: integer
+          format: int64
+        idempotencyKey:
+          type: string
+        ttlSeconds:
+          type: integer
+          format: int32
+    TransferDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        fromCardId:
+          type: integer
+          format: int64
+        toCardId:
+          type: integer
+          format: int64
+        fromLast4:
+          type: string
+        toLast4:
+          type: string
+        amount:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum:
+          - PENDING
+          - COMPLETED
+          - FAILED
+          - EXPIRED
+          - CANCELED
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        executedAt:
+          type: string
+          format: date-time
+        failureCode:
+          type: string
+        failureMessage:
+          type: string
+    CardCreateRequest:
+      required:
+      - expiry
+      - pan
+      type: object
+      properties:
+        pan:
+          pattern: "^\\d{16}$"
+          type: string
+        expiry:
+          pattern: "^\\d{4}-\\d{2}$"
+          type: string
+    CardDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        maskedNumber:
+          type: string
+        expiry:
+          type: string
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - BLOCKED
+          - EXPIRED
+        balance:
+          type: integer
+          format: int64
+    RegisterRequest:
+      required:
+      - confirmPassword
+      - password
+      - username
+      type: object
+      properties:
+        username:
+          maxLength: 254
+          minLength: 0
+          type: string
+        password:
+          maxLength: 100
+          minLength: 6
+          type: string
+        confirmPassword:
+          maxLength: 100
+          minLength: 6
+          type: string
+        passwordsMatch:
+          type: boolean
+    UserDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        roles:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+            enum:
+            - ROLE_USER
+            - ROLE_ADMIN
+    LoginRequest:
+      required:
+      - password
+      - username
+      type: object
+      properties:
+        username:
+          maxLength: 254
+          minLength: 0
+          type: string
+        password:
+          maxLength: 100
+          minLength: 6
+          type: string
+    LoginResponse:
+      type: object
+      properties:
+        tokenType:
+          type: string
+        accessToken:
+          type: string
+    CreateUserAdminRequest:
+      required:
+      - confirmPassword
+      - email
+      - password
+      type: object
+      properties:
+        email:
+          maxLength: 254
+          minLength: 0
+          type: string
+        password:
+          maxLength: 100
+          minLength: 6
+          type: string
+        confirmPassword:
+          maxLength: 100
+          minLength: 6
+          type: string
+        roles:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+            enum:
+            - ROLE_USER
+            - ROLE_ADMIN
+        passwordsMatch:
+          type: boolean
+    UpdateRolesRequest:
+      required:
+      - roles
+      type: object
+      properties:
+        roles:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+            enum:
+            - ROLE_USER
+            - ROLE_ADMIN
+    PageDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            type: object
+        pageNumber:
+          type: integer
+          format: int32
+        pageSize:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+        last:
+          type: boolean
+    PageDtoTransferDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransferDto'
+        pageNumber:
+          type: integer
+          format: int32
+        pageSize:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+        last:
+          type: boolean
+    PageDtoCardDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/CardDto'
+        pageNumber:
+          type: integer
+          format: int32
+        pageSize:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+        last:
+          type: boolean
+    PageDtoUserDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserDto'
+        pageNumber:
+          type: integer
+          format: int32
+        pageSize:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+        last:
+          type: boolean
+  securitySchemes:
+    BearerAuth:
+      type: http
+      name: BearerAuth
+      scheme: bearer
+      bearerFormat: JWT
